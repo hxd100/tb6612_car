@@ -32,7 +32,7 @@ car_bridge:
     wheel_invert_left: false
     wheel_invert_right: false
     dir_invert_left: false
-    dir_invert_right: true      # 本车实测：右轮 +指令时物理上往后转
+    dir_invert_right: true      # 2026-11-13 重新启用：右轮镜像
 
     # closed_loop: L=/R= 走 STM32 的 PID（推荐）
     # open_loop:   TESTL/TESTR 直接给占空比（极性没修好前的临时方案）
