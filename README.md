@@ -22,6 +22,35 @@ source install/setup.bash
 
 ## 2. 运行
 
+### 2.1 实车一键启动（推荐）
+
+`real_bringup.launch.py` 把**底盘、机器人模型、雷达、深度相机**打包成一个启动，
+用三个开关按需裁剪：
+
+```bash
+# 全套（底盘 + 模型 + 雷达 + 相机）
+ros2 launch tb6612_car real_bringup.launch.py
+
+# 底盘没上电，只跑雷达和相机
+ros2 launch tb6612_car real_bringup.launch.py use_chassis:=false
+
+# 只跑底盘（调试底盘时）
+ros2 launch tb6612_car real_bringup.launch.py use_lidar:=false use_camera:=false
+
+# 再加 RViz
+ros2 launch tb6612_car real_bringup.launch.py rviz:=true
+```
+
+| 参数 | 默认 | 作用 |
+| --- | --- | --- |
+| `use_chassis` | `true` | 启动 `car_bridge`（串口 ↔ STM32，发 `/odom`、TF） |
+| `use_lidar` | `true` | 启动 `lidar_node`（`/dev/lidar` → `/scan`） |
+| `use_camera` | `true` | 启动 `astra_camera`（`/camera/color|depth|ir`） |
+| `dir_invert_right` | `true` | 右轮镜像修正（下位机 `DIRR=1`） |
+| `rviz` | `false` | 启动 RViz |
+
+### 2.2 只调试底盘
+
 ```bash
 # 正常模式（走 STM32 的 PID）
 ros2 launch tb6612_car car_bridge.launch.py
@@ -227,3 +256,23 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 先按几次 `z` 降到 0.2。
 
 **松开按键不会停**，必须按 `k`。
+
+### 10.6 雷达与相机接入实测（2026-11-13）
+
+`real_bringup.launch.py use_chassis:=false`（底盘未通电）实测：
+
+| 项 | 结果 |
+| --- | --- |
+| `lidar_node` | ✅ 启动成功，`/scan` **5.99 Hz**，`frame_id: laser_frame` |
+| `astra_camera_node` | ✅ `/camera/color/image_raw` **30 Hz**，`/camera/depth/image_raw` **29.9 Hz** |
+| 深度有效像素 | 40.1%，量程 1.12 ~ 8.40 m |
+| TF `base_footprint → laser_frame` | (0, 0, 0.225) ✅ |
+| TF `base_footprint → camera_link` | (0.205, 0, 0.130) ✅ |
+
+**一个容易误判的现象**：深度图全 0 不一定是相机坏了。
+
+第一次测的时候彩色正常、深度全 0、IR 均值只有 8（几乎全黑），原因是**镜头被近处物体挡住**
+（离镜头不到 10 cm）。Astra 的最小测距约 0.6 m，太近就返回 0。
+
+> 判断方法：看 IR 图。如果 IR 也几乎没有内容，说明进光量不足（被挡或全黑环境），
+> 不是深度算法的问题。把相机转向 1~2 米外的开阔处再测即可。
